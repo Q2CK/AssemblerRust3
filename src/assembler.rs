@@ -1,79 +1,17 @@
-use std::collections::HashMap;
-use serde_derive::Deserialize;
+mod structs;
+
+#[macro_use]
+mod macros;
+
+use structs::*;
+use macros::*;
+
 use std::fs::File;
 use std::io::{Read, stdin};
 
 const ISA_VALIDATION_ERR_MSG: &str = "Invalid ISA file structure";
 const ISA_READ_ERR_MSG: &str = "Couldn't read ISA file";
 const ASM_ERR_MSG: &str = "Couldn't read ASM file";
-
-#[allow(dead_code)]
-#[derive(Debug, Deserialize)]
-struct CpuData {
-    cpu_name: String,
-    instruction_length: usize,
-    program_memory_lines: usize
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Deserialize)]
-struct Instruction {
-    opcode: String,
-    operands: Vec<String>,
-    keywords: Vec<String>
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Deserialize)]
-struct ISA {
-    cpu_data: CpuData,
-    define: HashMap<String, HashMap<String, String>>,
-    instructions: HashMap<String, Instruction>
-}
-
-struct Error {
-    file: String,
-    line: Option<u32>,
-    message: String
-}
-
-impl Error {
-    fn no_line(file: &String, message: String) -> Error {
-        Error {
-            file: file.to_string(), line: None, message
-        }
-    }
-
-    fn in_line(file: &String, line: &usize, message: &String) -> Error {
-        Error {
-            file: file.to_string(), line: Some(*line as u32), message: message.to_string()
-        }
-    }
-}
-
-struct AssemblerResult{
-    info: Vec<String>,
-    fails: Vec<Error>
-}
-
-impl AssemblerResult {
-    fn report(&self) {
-        match self.fails.len(){
-            0 => {
-                for element in &self.info {
-                    println!("{}", element);
-                }
-            }
-            _ =>
-                for element in &self.fails {
-                    match element.line {
-                        Some(nr) => println!(r#"Error in file "{}", line {}: {}"#, element.file, nr + 1, element.message),
-                        None => println!(r#"Error in file "{}": {}"#, element.file, element.message)
-                    }
-                }
-        };
-    }
-}
 
 fn deserialize_json_file(file_name: &String) -> Result<ISA, String> {
     let mut file = match File::open(file_name) {
@@ -87,7 +25,7 @@ fn deserialize_json_file(file_name: &String) -> Result<ISA, String> {
         Err(_) => return Err(ISA_READ_ERR_MSG.to_string())
     }
 
-    match serde_json::from_str(&contents) {
+    return match serde_json::from_str(&contents) {
         Ok(v) => Ok(v),
         Err(_) => Err(ISA_VALIDATION_ERR_MSG.to_string())
     }
@@ -100,7 +38,7 @@ fn read_assembly(file_name: &String) -> Result<String, String> {
     };
 
     let mut contents = String::new();
-    match file.read_to_string(&mut contents) {
+    return match file.read_to_string(&mut contents) {
         Ok(_) => Ok(contents),
         Err(_) => Err(ASM_ERR_MSG.to_string())
     }
@@ -138,8 +76,23 @@ fn open_files(isa: &mut Option<ISA>, mut isa_file_name: &mut String, asm: &mut S
 }
 
 fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String,
-         assembler_result: &mut AssemblerResult) {
+         assembler_result: &mut AssemblerResult) -> String {
 
+    let out = String::new();
+
+    let mut line_counter = 0;
+    let lines: Vec<Line> = asm.split("\n")
+        .map(|x| Line::new(x.to_string(), &mut line_counter))
+        .collect();
+
+    for line in lines {
+        println!("{:?}", line);
+        for (idx, token) in line.tokens.iter().enumerate() {
+
+        }
+    }
+
+    return out;
 }
 
 pub fn assemble() {
@@ -156,19 +109,12 @@ pub fn assemble() {
         let mut asm_file_name = String::new();
 
         open_files(&mut isa, &mut isa_file_name, &mut asm, &mut asm_file_name, &mut assembler_result);
-
-        if assembler_result.fails.len() != 0 {
-            assembler_result.report();
-            continue;
-        }
+        continue_on_err!(assembler_result);
 
         let isa = isa.unwrap();
-        parse(&isa, &isa_file_name, &asm, &asm_file_name, &mut assembler_result);
 
-        if assembler_result.fails.len() != 0 {
-            assembler_result.report();
-            continue;
-        }
+        let bin = parse(&isa, &isa_file_name, &asm, &asm_file_name, &mut assembler_result);
+        continue_on_err!(assembler_result);
 
         assembler_result.report();
     }
