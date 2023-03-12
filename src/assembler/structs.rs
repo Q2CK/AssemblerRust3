@@ -10,15 +10,16 @@ pub struct CpuData {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum Section {
+pub enum Kind {
     Opcode(String),
-    Operands(Vec<String>)
+    Operand(usize),
+    Filler(usize)
 }
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct Instruction {
-    pub layout: Vec<Section>,
+    pub layout: Vec<Kind>,
     pub keywords: Vec<String>
 }
 
@@ -27,7 +28,7 @@ pub struct Instruction {
 pub struct ISA {
     pub cpu_data: CpuData,
     pub define: HashMap<String, HashMap<String, String>>,
-    pub instructions: HashMap<String, Instruction>
+    pub instructions: HashMap<String, Instruction>,
 }
 
 pub struct Error {
@@ -39,7 +40,7 @@ pub struct Error {
 impl Error {
     pub fn no_line(file: &String, message: String) -> Error {
         return Error {
-            file: file.to_string(), line: None, message
+            file: file.to_string(), line: None, message: message.to_string()
         }
     }
 
@@ -77,17 +78,12 @@ impl AssemblerResult {
 #[derive(Debug, Deserialize)]
 pub struct Token {
     pub content: String,
-    pub is_num: bool
 }
 
 impl Token {
     pub fn new(content: &String) -> Token{
         Token {
-            content: content.to_string(),
-            is_num: match content.parse::<usize>() {
-                Ok(_) => true,
-                Err(_) => false
-            }
+            content: content.to_string()
         }
     }
 

@@ -6,76 +6,91 @@ mod macros;
 use structs::*;
 use macros::*;
 
-use std::fs::File;
+use std::fs;
 use std::io::{Read, stdin};
+use std::env;
+use std::path::Path;
 
 const ISA_VALIDATION_ERR_MSG: &str = "Invalid ISA file structure";
 const ISA_READ_ERR_MSG: &str = "Couldn't read ISA file";
 const ASM_ERR_MSG: &str = "Couldn't read ASM file";
 
 fn deserialize_json_file(file_name: &String) -> Result<ISA, String> {
-    let mut file = match File::open(file_name) {
-        Ok(v) => v,
-        Err(_) => return Err(ISA_READ_ERR_MSG.to_string())
-    };
 
     let mut contents = String::new();
-    match file.read_to_string(&mut contents) {
-        Ok(_) => (),
+    match fs::read_to_string(file_name) {
+        Ok(v) => contents = v,
         Err(_) => return Err(ISA_READ_ERR_MSG.to_string())
     }
 
     return match serde_json::from_str(&contents) {
         Ok(v) => Ok(v),
-        Err(_) => Err(ISA_VALIDATION_ERR_MSG.to_string())
+        Err(e) => Err(format!("{} - {}", ISA_VALIDATION_ERR_MSG.to_string(), e.to_string()))
     }
 }
 
 fn read_assembly(file_name: &String) -> Result<String, String> {
-    let mut file = match File::open(file_name) {
-        Ok(v) => v,
+    match fs::read_to_string(Path::new(&file_name)) {
+        Ok(v) => Ok(v),
         Err(_) => return Err(ASM_ERR_MSG.to_string())
-    };
-
-    let mut contents = String::new();
-    return match file.read_to_string(&mut contents) {
-        Ok(_) => Ok(contents),
-        Err(_) => Err(ASM_ERR_MSG.to_string())
     }
 }
 
-fn open_files(isa: &mut Option<ISA>, mut isa_file_name: &mut String, asm: &mut String,
+fn open_files(isa: &mut Option<ISA>, asm: &mut String,
               mut asm_file_name: &mut String, assembler_result: &mut AssemblerResult) {
-
-    println!("\nISA file name: ");
-    stdin().read_line(&mut isa_file_name).unwrap();
-    *isa_file_name = "ISA/".to_string() + &isa_file_name[0..&isa_file_name.len() - 1].to_string();
-    let isa_result = deserialize_json_file(&isa_file_name);
-
-    match isa_result {
-        Ok(v) => {
-            assembler_result.info.push(v.cpu_data.cpu_name.clone());
-            assembler_result.info.push("------------------------".to_string());
-            *isa = Some(v);
-        }
-        Err(e) => {
-            assembler_result.fails.push(Error::no_line(&isa_file_name, e));
-            *isa = None;
-        }
-    }
+    let path = env::current_dir().unwrap();
 
     println!("ASM file name: ");
     stdin().read_line(&mut asm_file_name).unwrap();
-    *asm_file_name = "ASM/".to_string() + &asm_file_name[0..&asm_file_name.len() - 1].to_string();
+    *asm_file_name = "ASM/".to_string() + &asm_file_name[0..&asm_file_name.len() - 1].to_string().trim();
+
     let asm_result = read_assembly(&asm_file_name);
 
     match asm_result {
         Ok(v) => *asm = v,
         Err(e) => assembler_result.fails.push(Error::no_line(&asm_file_name, e))
     }
+
+    let isa_declarations: Vec<String> = asm.split("\n")
+        .filter(|x| x.starts_with("#isa "))
+        .map(|x| x.to_string())
+        .collect();
+
+    if isa_declarations.len() == 1 {
+        let isa_file_name = isa_declarations.iter().find(|x| x.starts_with("#isa "));
+        match isa_file_name {
+            Some(v) => {
+                match deserialize_json_file(&("ISA/".to_string() + v[4..].trim() + ".json")) {
+                    Ok(v) => {
+                        assembler_result.info.push(v.cpu_data.cpu_name.clone());
+                        assembler_result.info.push("------------------------".to_string());
+                        *isa = Some(v);
+                    },
+                    Err(e) => {
+                        assembler_result.fails.push(
+                            Error::no_line(&asm_file_name, e)
+
+                        );
+                        return;
+                    }
+                }
+            },
+            None => {
+                assembler_result.fails.push(
+                    Error::no_line(&asm_file_name, ISA_READ_ERR_MSG.to_string())
+                );
+                return;
+            }
+        }
+    }
+    else {
+        assembler_result.fails.push(
+            Error::no_line(&asm_file_name, "Single ISA declaration required".to_string())
+        );
+    }
 }
 
-fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String,
+fn parse(isa: &ISA, asm: &String, asm_file_name: &String,
          assembler_result: &mut AssemblerResult) -> String {
 
     let out = String::new();
@@ -85,9 +100,20 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
         .map(|x| Line::new(x.to_string(), &mut line_counter))
         .collect();
 
-    for line in lines {
+    for line in &lines {
         println!("{:?}", line);
-        for (idx, token) in line.tokens.iter().enumerate() {
+
+        if line.tokens.len() == 0 {
+            continue;
+        }
+
+        let mnemonic = &line.tokens[0].content;
+        let operands = &line.tokens[1..];
+
+        if isa.instructions.contains_key(mnemonic) {
+
+        }
+        else {
 
         }
     }
@@ -96,6 +122,8 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
 }
 
 pub fn assemble() {
+    let path = env::current_dir().unwrap();
+    println!("The current directory is {}", path.display());
     loop {
         let mut assembler_result = AssemblerResult {
             info: Vec::new(),
@@ -103,17 +131,18 @@ pub fn assemble() {
         };
 
         let mut isa = None;
-        let mut isa_file_name = String::new();
 
         let mut asm = String::new();
         let mut asm_file_name = String::new();
 
-        open_files(&mut isa, &mut isa_file_name, &mut asm, &mut asm_file_name, &mut assembler_result);
+        open_files(&mut isa, &mut asm, &mut asm_file_name, &mut assembler_result);
         continue_on_err!(assembler_result);
 
         let isa = isa.unwrap();
 
-        let bin = parse(&isa, &isa_file_name, &asm, &asm_file_name, &mut assembler_result);
+        println!("{:?}", isa);
+
+        let bin = parse(&isa, &asm, &asm_file_name, &mut assembler_result);
         continue_on_err!(assembler_result);
 
         assembler_result.report();

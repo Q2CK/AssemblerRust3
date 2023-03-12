@@ -28,14 +28,23 @@
     }
   },
   "instructions": {
-
     "add": {
       "layout": [
         {"Opcode": "0000"},
-        {"Operands": ["----", "----", "----"]}
+        {"Operand": 4},
+        {"Operand": 4},
+        {"Operand": 4}
+      ],
+      "keywords": ["registers"]
+    },
+    "sub": {
+      "layout": [
+        {"Opcode": "0001"},
+        {"Operand": 4},
+        {"Operand": 4},
+        {"Operand": 4}
       ],
       "keywords": ["registers"]
     }
-
   }
 }
