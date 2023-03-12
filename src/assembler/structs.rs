@@ -75,7 +75,7 @@ impl AssemblerResult {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Token {
     pub content: String,
 }
@@ -110,7 +110,7 @@ pub struct Line {
 }
 
 impl Line {
-    pub fn new(line_string: String, mut line_counter: &mut usize) -> Line {
+    pub fn new(line_string: String, line_counter: &mut usize) -> Line {
         let line_nr= *line_counter;
         *line_counter += 1;
         Line {

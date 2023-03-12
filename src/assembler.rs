@@ -4,7 +4,6 @@ mod structs;
 mod macros;
 
 use structs::*;
-use macros::*;
 
 use std::fs;
 use std::io::{Read, stdin};
@@ -18,6 +17,7 @@ const ASM_ERR_MSG: &str = "Couldn't read ASM file";
 fn deserialize_json_file(file_name: &String) -> Result<ISA, String> {
 
     let mut contents = String::new();
+
     match fs::read_to_string(file_name) {
         Ok(v) => contents = v,
         Err(_) => return Err(ISA_READ_ERR_MSG.to_string())
@@ -86,7 +86,7 @@ fn open_files(isa: &mut Option<ISA>, asm: &mut String,
     }
 }
 
-fn parse(isa: &ISA, asm: &String, assembler_result: &mut AssemblerResult) -> String {
+fn parse(isa: &ISA, asm: &String, asm_file_name: &String, assembler_result: &mut AssemblerResult) -> String {
 
     let out = String::new();
 
@@ -95,21 +95,22 @@ fn parse(isa: &ISA, asm: &String, assembler_result: &mut AssemblerResult) -> Str
         .map(|x| Line::new(x.to_string(), &mut line_counter))
         .collect();
 
-    for line in &lines {
+    for (idx, line) in lines.iter().enumerate() {
         println!("{:?}", line);
 
         if line.tokens.len() == 0 {
             continue;
         }
 
-        let mnemonic = &line.tokens[0].content;
-        let operands = &line.tokens[1..];
+        let mnemonic: String = line.tokens[0].content.clone();
+        let operands: Vec<Token> = line.tokens[1..].to_vec();
 
-        if isa.instructions.contains_key(mnemonic) {
+        if isa.instructions.contains_key(&*mnemonic) {
 
         }
         else {
-            assembler_result
+            assembler_result.fails.push(Error::in_line(&asm_file_name, &idx,
+            &format!("Unknown instruction mnemonic {}", mnemonic)));
         }
     }
 
@@ -137,7 +138,7 @@ pub fn assemble() {
 
         println!("{:?}", isa);
 
-        let bin = parse(&isa, &asm, &mut assembler_result);
+        let bin = parse(&isa, &asm, &asm_file_name, &mut assembler_result);
         continue_on_err!(assembler_result);
 
         assembler_result.report();
