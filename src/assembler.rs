@@ -38,6 +38,7 @@ fn read_assembly(file_name: &String) -> Result<String, String> {
 
 fn open_files(isa: &mut Option<ISA>, asm: &mut String,
               mut asm_file_name: &mut String, assembler_result: &mut AssemblerResult) {
+
     let path = env::current_dir().unwrap();
 
     println!("ASM file name: ");
@@ -67,18 +68,13 @@ fn open_files(isa: &mut Option<ISA>, asm: &mut String,
                         *isa = Some(v);
                     },
                     Err(e) => {
-                        assembler_result.fails.push(
-                            Error::no_line(&asm_file_name, e)
-
-                        );
+                        assembler_result.fails.push(Error::no_line(&asm_file_name, e));
                         return;
                     }
                 }
             },
             None => {
-                assembler_result.fails.push(
-                    Error::no_line(&asm_file_name, ISA_READ_ERR_MSG.to_string())
-                );
+                assembler_result.fails.push(Error::no_line(&asm_file_name, ISA_READ_ERR_MSG.to_string()));
                 return;
             }
         }
@@ -90,8 +86,7 @@ fn open_files(isa: &mut Option<ISA>, asm: &mut String,
     }
 }
 
-fn parse(isa: &ISA, asm: &String, asm_file_name: &String,
-         assembler_result: &mut AssemblerResult) -> String {
+fn parse(isa: &ISA, asm: &String, assembler_result: &mut AssemblerResult) -> String {
 
     let out = String::new();
 
@@ -114,7 +109,7 @@ fn parse(isa: &ISA, asm: &String, asm_file_name: &String,
 
         }
         else {
-
+            assembler_result
         }
     }
 
@@ -142,7 +137,7 @@ pub fn assemble() {
 
         println!("{:?}", isa);
 
-        let bin = parse(&isa, &asm, &asm_file_name, &mut assembler_result);
+        let bin = parse(&isa, &asm, &mut assembler_result);
         continue_on_err!(assembler_result);
 
         assembler_result.report();
