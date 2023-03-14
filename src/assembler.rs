@@ -16,9 +16,8 @@ const ISA_READ_ERR_MSG: &str = "Couldn't read ISA file";
 const ASM_ERR_MSG: &str = "Couldn't read ASM file";
 
 const RESERVED_ISA: &str = "#isa";
-const RESERVED_DEFINE: &str = "#isa";
+const RESERVED_DEFINE: &str = "#define";
 const RESERVED_LABEL: &str = ".";
-
 
 fn deserialize_json_file(file_name: &String) -> Result<ISA, String> {
 
@@ -28,7 +27,6 @@ fn deserialize_json_file(file_name: &String) -> Result<ISA, String> {
         Ok(v) => contents = v,
         Err(_) => return Err(ISA_READ_ERR_MSG.to_string())
     }
-
     return match serde_json::from_str(&contents) {
         Ok(v) => Ok(v),
         Err(e) => Err(format!("{} - {}", ISA_VALIDATION_ERR_MSG.to_string(), e.to_string()))
@@ -86,18 +84,13 @@ fn open_files(isa: &mut Option<ISA>, mut isa_file_name: &mut String, asm: &mut S
                 return;
             }
         }
-    }
-    else {
-        assembler_result.fails.push(
-            Error::no_line(&asm_file_name, "Single ISA declaration required".to_string())
-        );
+    } else {
+        assembler_result.fails.push(Error::no_line(&asm_file_name, "Single ISA declaration required".to_string()));
     }
 }
 
 fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String, assembler_result: &mut AssemblerResult) -> String {
-
     let mut out = String::new();
-
     let mut line_counter = 0;
     let expected_line_length = isa.cpu_data.instruction_length;
 
@@ -106,19 +99,16 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
         .collect();
 
     for (line_nr, line) in lines.iter().enumerate() {
-
         let mut out_line = String::new();
+        let mnemonic: String;
 
-        if line.tokens.len() == 0 || line.tokens[0].content.starts_with(RESERVED_ISA)
-                                  || line.tokens[0].content.starts_with(RESERVED_DEFINE)
-                                  || line.tokens[0].content.starts_with(RESERVED_LABEL) {
+        if line.tokens.len() == 0 || line.tokens[0].content.starts_with(RESERVED_ISA) || line.tokens[0].content.starts_with(RESERVED_DEFINE) || line.tokens[0].content.starts_with(RESERVED_LABEL) {
             continue;
+        } else {
+            mnemonic = line.tokens[0].content.clone();
         }
 
-        let mnemonic: String = line.tokens[0].content.clone();
-
         if isa.instructions.contains_key(&mnemonic) {
-
             let expected = isa.instructions[&mnemonic].layout.iter();
             let expected_operands_len = expected.clone().filter(|x| matches!(x, Kind::Operand(_))).count();
 
@@ -135,51 +125,35 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
                         if opcode_found == false {
                             out_line += opcode;
                             opcode_found = true;
-                        }
-                        else {
-                            assembler_result.fails.push(Error::no_line(isa_file_name,
-                                                                       format!(r#"Instruction "{}" was configured
-                                                                       to expect more than one opcode"#, mnemonic)
+                        } else {
+                            assembler_result.fails.push(Error::no_line(isa_file_name, format!(r#"Instruction "{}" was configured to expect more than one opcode"#, mnemonic)
                                 )
                             );
                             return "".to_string();
                         }
                     },
-
                     Kind::Operand(operand_length) => {
                         if nr_handled_operands < expected_operands_len && operands.len() > 0 {
-
                             let mut operand: usize = 0;
                             let provided_operand = operands.remove(0).content;
-
                             match provided_operand.parse() {
                                 Ok(v) => operand = v,
                                 Err(_) => {
-                                    assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr,
-                                                                               format!(r#"Failed to parse token "{}""#,
-                                                                                       provided_operand)));
+                                    assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr, format!(r#"Failed to parse token "{}""#, provided_operand)));
                                     return "".to_string();
                                 }
                             };
                             let bin_operand = format!("{operand:b}");
                             out_line += &format!("{bin_operand:0>0$}", operand_length);
-
                             nr_handled_operands += 1;
                         }
                         else if nr_handled_operands < expected_operands_len && operands.len() == 0 {
-                            assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr,
-                                                                       format!("Too few operands - expected {}, found {}",
-                                                                               expected_operands_len, provided_operands_len)
-                                )
+                            assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr, format!("Too few operands - expected {}, found {}", expected_operands_len, provided_operands_len))
                             );
                             return "".to_string();
                         }
                         else if nr_handled_operands >= expected_operands_len && operands.len() > 0 {
-                            assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr,
-                                                                       format!("Too many operands - expected {}, found {}",
-                                                                               expected_operands_len, provided_operands_len)
-                                )
-                            );
+                            assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr, format!("Too many operands - expected {}, found {}", expected_operands_len, provided_operands_len)));
                             return "".to_string();
                         }
                     },
@@ -198,13 +172,10 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
                     println!("{}", out_line);
                     out_line += "\n";
                 }
-                false => assembler_result.fails.push(Error::in_line(&asm_file_name, &line_nr,
-                                                                    format!("Operand exceeded max binary value")))
+                false => assembler_result.fails.push(Error::in_line(&asm_file_name, &line_nr, format!("Operand exceeded max binary value")))
             }
-        }
-        else {
-            assembler_result.fails.push(Error::in_line(&asm_file_name, &line_nr,
-                                                       format!(r#"Unknown instruction mnemonic "{}""#, mnemonic)));
+        } else {
+            assembler_result.fails.push(Error::in_line(&asm_file_name, &line_nr, format!(r#"Unknown instruction mnemonic "{}""#, mnemonic)));
             return "".to_string();
         }
         out += &out_line;
@@ -213,7 +184,6 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
 }
 
 pub fn assemble() {
-
     let path = env::current_dir().unwrap();
     println!("The current directory is {}", path.display());
 
@@ -225,7 +195,6 @@ pub fn assemble() {
 
         let mut isa = None;
         let mut isa_file_name = String::new();
-
         let mut asm = String::new();
         let mut asm_file_name = String::new();
 
@@ -233,7 +202,6 @@ pub fn assemble() {
         continue_on_err!(assembler_result);
 
         let isa = isa.unwrap();
-
         let bin = parse(&isa, &isa_file_name, &asm, &asm_file_name, &mut assembler_result);
         continue_on_err!(assembler_result);
 

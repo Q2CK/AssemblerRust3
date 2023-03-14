@@ -1,4 +1,4 @@
 #isa AnPUNano
 
-add 3, 4, 3
+add add add add, add
 add 1, 1, 0
