@@ -9,11 +9,11 @@ pub struct CpuData {
     pub program_memory_lines: usize
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum Kind {
     Opcode(String),
     Operand(usize),
-    Filler(usize)
+    Filler(char, usize)
 }
 
 #[allow(dead_code)]
@@ -44,7 +44,7 @@ impl Error {
         }
     }
 
-    pub fn in_line(file: &String, line: &usize, message: &String) -> Error {
+    pub fn in_line(file: &String, line: &usize, message: String) -> Error {
         return Error {
             file: file.to_string(), line: Some(*line as u32), message: message.to_string()
         }

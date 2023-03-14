@@ -9,10 +9,16 @@ use std::fs;
 use std::io::{Read, stdin};
 use std::env;
 use std::path::Path;
+use crate::assembler::structs::Kind::Operand;
 
 const ISA_VALIDATION_ERR_MSG: &str = "Invalid ISA file structure";
 const ISA_READ_ERR_MSG: &str = "Couldn't read ISA file";
 const ASM_ERR_MSG: &str = "Couldn't read ASM file";
+
+const RESERVED_ISA: &str = "#isa";
+const RESERVED_DEFINE: &str = "#isa";
+const RESERVED_LABEL: &str = ".";
+
 
 fn deserialize_json_file(file_name: &String) -> Result<ISA, String> {
 
@@ -36,7 +42,7 @@ fn read_assembly(file_name: &String) -> Result<String, String> {
     }
 }
 
-fn open_files(isa: &mut Option<ISA>, asm: &mut String,
+fn open_files(isa: &mut Option<ISA>, mut isa_file_name: &mut String, asm: &mut String,
               mut asm_file_name: &mut String, assembler_result: &mut AssemblerResult) {
 
     let path = env::current_dir().unwrap();
@@ -53,19 +59,21 @@ fn open_files(isa: &mut Option<ISA>, asm: &mut String,
     }
 
     let isa_declarations: Vec<String> = asm.split("\n")
-        .filter(|x| x.starts_with("#isa "))
+        .filter(|x| x.starts_with(RESERVED_ISA))
         .map(|x| x.to_string())
         .collect();
 
     if isa_declarations.len() == 1 {
-        let isa_file_name = isa_declarations.iter().find(|x| x.starts_with("#isa "));
-        match isa_file_name {
+        let isa_file_name_option = isa_declarations.iter().find(|x| x.starts_with("#isa "));
+        match isa_file_name_option {
             Some(v) => {
-                match deserialize_json_file(&("ISA/".to_string() + v[4..].trim() + ".json")) {
+                let isa_file_name_no_prefix = &(v[4..].trim().to_string() + ".json");
+                match deserialize_json_file(&("ISA/".to_string() + isa_file_name_no_prefix)) {
                     Ok(v) => {
                         assembler_result.info.push(v.cpu_data.cpu_name.clone());
                         assembler_result.info.push("------------------------".to_string());
                         *isa = Some(v);
+                        *isa_file_name = isa_file_name_no_prefix.to_string();
                     },
                     Err(e) => {
                         assembler_result.fails.push(Error::no_line(&asm_file_name, e));
@@ -86,40 +94,133 @@ fn open_files(isa: &mut Option<ISA>, asm: &mut String,
     }
 }
 
-fn parse(isa: &ISA, asm: &String, asm_file_name: &String, assembler_result: &mut AssemblerResult) -> String {
+fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String, assembler_result: &mut AssemblerResult) -> String {
 
-    let out = String::new();
+    let mut out = String::new();
 
     let mut line_counter = 0;
+    let expected_line_length = isa.cpu_data.instruction_length;
+
     let lines: Vec<Line> = asm.split("\n")
         .map(|x| Line::new(x.to_string(), &mut line_counter))
         .collect();
 
-    for (idx, line) in lines.iter().enumerate() {
-        println!("{:?}", line);
+    for (line_nr, line) in lines.iter().enumerate() {
 
-        if line.tokens.len() == 0 {
+        let mut out_line = String::new();
+
+        if line.tokens.len() == 0 || line.tokens[0].content.starts_with(RESERVED_ISA)
+                                  || line.tokens[0].content.starts_with(RESERVED_DEFINE)
+                                  || line.tokens[0].content.starts_with(RESERVED_LABEL) {
             continue;
         }
 
         let mnemonic: String = line.tokens[0].content.clone();
-        let operands: Vec<Token> = line.tokens[1..].to_vec();
 
-        if isa.instructions.contains_key(&*mnemonic) {
+        if isa.instructions.contains_key(&mnemonic) {
 
+            let expected = isa.instructions[&mnemonic].layout.iter();
+            let expected_operands_len = expected.clone().filter(|x| matches!(x, Kind::Operand(_))).count();
+
+            let mut opcode_found = false;
+
+            let mut operands: Vec<Token> = line.tokens[1..].to_vec();
+            let provided_operands_len = operands.len();
+
+            let mut nr_handled_operands: usize = 0;
+
+            for item in expected {
+                match item {
+                    Kind::Opcode(opcode) => {
+                        if opcode_found == false {
+                            out_line += opcode;
+                            opcode_found = true;
+                        }
+                        else {
+                            assembler_result.fails.push(
+                                Error::no_line(isa_file_name,
+                                               format!(r#"Instruction "{}" was configured
+                                               to expect more than one opcode"#, mnemonic)
+                                )
+                            );
+                            return "".to_string();
+                        }
+                    },
+
+                    Kind::Operand(operand_length) => {
+                        if nr_handled_operands < expected_operands_len && operands.len() > 0 {
+
+                            let mut operand: usize = 0;
+                            let provided_operand = operands.remove(0).content;
+
+                            match provided_operand.parse() {
+                                Ok(v) => operand = v,
+                                Err(_) => {
+                                    assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr,
+                                    format!(r#"Failed to parse token "{}""#, provided_operand)));
+                                    return "".to_string();
+                                }
+                            };
+                            let bin_operand = format!("{operand:b}");
+                            out_line += &format!("{bin_operand:0>0$}", operand_length);
+
+                            nr_handled_operands += 1;
+                        }
+                        else if nr_handled_operands < expected_operands_len && operands.len() == 0 {
+                            assembler_result.fails.push(
+                                Error::in_line(asm_file_name, &line_nr,
+                                               format!("Too few operands - expected {}, found {}",
+                                                        expected_operands_len, provided_operands_len)
+                                )
+                            );
+                            return "".to_string();
+                        }
+                        else if nr_handled_operands >= expected_operands_len && operands.len() > 0 {
+                            assembler_result.fails.push(
+                                Error::in_line(asm_file_name, &line_nr,
+                                               format!("Too many operands - expected {}, found {}",
+                                                        expected_operands_len, provided_operands_len)
+                                )
+                            );
+                            return "".to_string();
+                        }
+                    },
+
+                    Kind::Filler(filler_char, filler_length) => {
+                        out_line += &(0..*filler_length).map(|_| filler_char).collect::<String>();
+                    },
+
+                    _ => {
+                        assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr,
+                        format!(r#"Token/tokens failed to match with any token type"#)));
+                        return "".to_string();
+                    }
+                }
+            }
+            if out_line.len() != expected_line_length {
+                assembler_result.fails.push(Error::in_line(&asm_file_name, &line_nr,
+                                                           format!("Operand exceeded max binary value")));
+            }
+            else {
+                println!("{}", out_line);
+                out_line += "\n";
+            }
         }
         else {
-            assembler_result.fails.push(Error::in_line(&asm_file_name, &idx,
-            &format!("Unknown instruction mnemonic {}", mnemonic)));
+            assembler_result.fails.push(Error::in_line(&asm_file_name, &line_nr,
+                                                       format!(r#"Unknown instruction mnemonic "{}""#, mnemonic)));
+            return "".to_string();
         }
+        out += &out_line;
     }
-
     return out;
 }
 
 pub fn assemble() {
+
     let path = env::current_dir().unwrap();
     println!("The current directory is {}", path.display());
+
     loop {
         let mut assembler_result = AssemblerResult {
             info: Vec::new(),
@@ -127,18 +228,17 @@ pub fn assemble() {
         };
 
         let mut isa = None;
+        let mut isa_file_name = String::new();
 
         let mut asm = String::new();
         let mut asm_file_name = String::new();
 
-        open_files(&mut isa, &mut asm, &mut asm_file_name, &mut assembler_result);
+        open_files(&mut isa, &mut isa_file_name, &mut asm, &mut asm_file_name, &mut assembler_result);
         continue_on_err!(assembler_result);
 
         let isa = isa.unwrap();
 
-        println!("{:?}", isa);
-
-        let bin = parse(&isa, &asm, &asm_file_name, &mut assembler_result);
+        let bin = parse(&isa, &isa_file_name, &asm, &asm_file_name, &mut assembler_result);
         continue_on_err!(assembler_result);
 
         assembler_result.report();
