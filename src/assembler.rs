@@ -167,29 +167,25 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
                             nr_handled_operands += 1;
                         }
                         else if nr_handled_operands < expected_operands_len && operands.len() == 0 {
-                            assembler_result.fails.push(
-                                Error::in_line(asm_file_name, &line_nr,
-                                               format!("Too few operands - expected {}, found {}",
+                            assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr,
+                                                format!("Too few operands - expected {}, found {}",
                                                         expected_operands_len, provided_operands_len)
                                 )
                             );
                             return "".to_string();
                         }
                         else if nr_handled_operands >= expected_operands_len && operands.len() > 0 {
-                            assembler_result.fails.push(
-                                Error::in_line(asm_file_name, &line_nr,
-                                               format!("Too many operands - expected {}, found {}",
+                            assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr,
+                                                format!("Too many operands - expected {}, found {}",
                                                         expected_operands_len, provided_operands_len)
                                 )
                             );
                             return "".to_string();
                         }
                     },
-
                     Kind::Filler(filler_char, filler_length) => {
                         out_line += &(0..*filler_length).map(|_| filler_char).collect::<String>();
                     },
-
                     _ => {
                         assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr,
                         format!(r#"Token/tokens failed to match with any token type"#)));
@@ -197,13 +193,13 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
                     }
                 }
             }
-            if out_line.len() != expected_line_length {
-                assembler_result.fails.push(Error::in_line(&asm_file_name, &line_nr,
-                                                           format!("Operand exceeded max binary value")));
-            }
-            else {
-                println!("{}", out_line);
-                out_line += "\n";
+            match out_line.len() == expected_line_length {
+                true => {
+                    println!("{}", out_line);
+                    out_line += "\n";
+                }
+                false => assembler_result.fails.push(Error::in_line(&asm_file_name, &line_nr,
+                                                                    format!("Operand exceeded max binary value")))
             }
         }
         else {
