@@ -28,9 +28,17 @@
     }
   },
   "instructions": {
-    "add": {
+    "int": {
       "layout": [
         {"Opcode": "0000"},
+        {"Operand": 4},
+        {"Operand": 8}
+      ],
+      "keywords": []
+    },
+    "add": {
+      "layout": [
+        {"Opcode": "0001"},
         {"Operand": 4},
         {"Operand": 4},
         {"Operand": 4}
@@ -39,12 +47,123 @@
     },
     "sub": {
       "layout": [
-        {"Opcode": "0001"},
+        {"Opcode": "0010"},
         {"Operand": 4},
         {"Operand": 4},
         {"Operand": 4}
       ],
       "keywords": ["registers"]
+    },
+    "and": {
+      "layout": [
+        {"Opcode": "0011"},
+        {"Operand": 4},
+        {"Operand": 4},
+        {"Operand": 4}
+      ],
+      "keywords": ["registers"]
+    },
+    "nor": {
+      "layout": [
+        {"Opcode": "0100"},
+        {"Operand": 4},
+        {"Operand": 4},
+        {"Operand": 4}
+      ],
+      "keywords": ["registers"]
+    },
+    "xor": {
+      "layout": [
+        {"Opcode": "0101"},
+        {"Operand": 4},
+        {"Operand": 4},
+        {"Operand": 4}
+      ],
+      "keywords": ["registers"]
+    },
+    "rsh": {
+      "layout": [
+        {"Opcode": "0110"},
+        {"Operand": 4},
+        {"Operand": 4},
+        {"Filler": ["0", 4]}
+      ],
+      "keywords": ["registers"]
+    },
+    "cmp": {
+      "layout": [
+        {"Opcode": "0111"},
+        {"Filler": ["0", 4]},
+        {"Operand": 4},
+        {"Operand": 4}
+      ],
+      "keywords": ["registers"]
+    },
+    "imm": {
+      "layout": [
+        {"Opcode": "1000"},
+        {"Operand": 4},
+        {"Operand": 8}
+      ],
+      "keywords": ["registers"]
+    },
+    "dml": {
+      "layout": [
+        {"Opcode": "1001"},
+        {"Operand": 4},
+        {"Operand": 8}
+      ],
+      "keywords": ["registers"]
+    },
+    "dms": {
+      "layout": [
+        {"Opcode": "1010"},
+        {"Operand": 4},
+        {"Operand": 8}
+      ],
+      "keywords": ["registers"]
+    },
+    "iml": {
+      "layout": [
+        {"Opcode": "1011"},
+        {"Operand": 4},
+        {"Operand": 4},
+        {"Filler": ["0", 4]}
+      ],
+      "keywords": ["registers"]
+    },
+    "ims": {
+      "layout": [
+        {"Opcode": "1100"},
+        {"Filler": ["0", 4]},
+        {"Operand": 4},
+        {"Operand": 4}
+      ],
+      "keywords": ["registers"]
+    },
+    "brc": {
+      "layout": [
+        {"Opcode": "1101"},
+        {"Operand": 4},
+        {"Operand": 8}
+      ],
+      "keywords": []
+    },
+    "ibr": {
+      "layout": [
+        {"Opcode": "1110"},
+        {"Operand": 4},
+        {"Operand": 4},
+        {"Operand": 4}
+      ],
+      "keywords": ["registers"]
+    },
+    "jmp": {
+      "layout": [
+        {"Opcode": "1111"},
+        {"Operand": 12}
+      ],
+      "keywords": []
     }
   }
 }

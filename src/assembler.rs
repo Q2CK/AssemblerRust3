@@ -94,6 +94,16 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
     let mut line_counter = 0;
     let expected_line_length = isa.cpu_data.instruction_length;
 
+    let define_declarations: Vec<String> = asm.split("\n")
+        .filter(|x| x.starts_with(RESERVED_DEFINE))
+        .map(|x| x.to_string())
+        .collect();
+
+    let label_declarations: Vec<String> = asm.split("\n")
+        .filter(|x| x.starts_with(RESERVED_LABEL))
+        .map(|x| x.to_string())
+        .collect();
+
     let lines: Vec<Line> = asm.split("\n")
         .map(|x| Line::new(x.to_string(), &mut line_counter))
         .collect();
@@ -126,13 +136,11 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
                             out_line += opcode;
                             opcode_found = true;
                         } else {
-                            assembler_result.fails.push(Error::no_line(isa_file_name, format!(r#"Instruction "{}" was configured to expect more than one opcode"#, mnemonic)
-                                )
-                            );
-                            return "".to_string();
+                            assembler_result.fails.push(Error::no_line(isa_file_name, format!(r#"Instruction "{}" was configured to expect more than one opcode"#, mnemonic)));
                         }
                     },
                     Kind::Operand(operand_length) => {
+                        println!("{} {} {}", operands.len(), nr_handled_operands, expected_operands_len);
                         if nr_handled_operands < expected_operands_len && operands.len() > 0 {
                             let mut operand: usize = 0;
                             let provided_operand = operands.remove(0).content;
@@ -140,7 +148,6 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
                                 Ok(v) => operand = v,
                                 Err(_) => {
                                     assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr, format!(r#"Failed to parse token "{}""#, provided_operand)));
-                                    return "".to_string();
                                 }
                             };
                             let bin_operand = format!("{operand:b}");
@@ -148,13 +155,7 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
                             nr_handled_operands += 1;
                         }
                         else if nr_handled_operands < expected_operands_len && operands.len() == 0 {
-                            assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr, format!("Too few operands - expected {}, found {}", expected_operands_len, provided_operands_len))
-                            );
-                            return "".to_string();
-                        }
-                        else if nr_handled_operands >= expected_operands_len && operands.len() > 0 {
-                            assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr, format!("Too many operands - expected {}, found {}", expected_operands_len, provided_operands_len)));
-                            return "".to_string();
+                            assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr, format!("Too few operands - expected {}, found {}", expected_operands_len, provided_operands_len)));
                         }
                     },
                     Kind::Filler(filler_char, filler_length) => {
@@ -163,9 +164,11 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
                     _ => {
                         assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr,
                         format!(r#"Token/tokens failed to match with any token type"#)));
-                        return "".to_string();
                     }
                 }
+            }
+            if operands.len() > 0 {
+                assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr, format!("Too many operands - expected {}, found {}", expected_operands_len, provided_operands_len)));
             }
             match out_line.len() == expected_line_length {
                 true => {
@@ -176,7 +179,6 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
             }
         } else {
             assembler_result.fails.push(Error::in_line(&asm_file_name, &line_nr, format!(r#"Unknown instruction mnemonic "{}""#, mnemonic)));
-            return "".to_string();
         }
         out += &out_line;
     }
