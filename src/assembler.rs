@@ -137,10 +137,10 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
                             opcode_found = true;
                         } else {
                             assembler_result.fails.push(Error::no_line(isa_file_name, format!(r#"Instruction "{}" was configured to expect more than one opcode"#, mnemonic)));
+                            break;
                         }
                     },
                     Kind::Operand(operand_length) => {
-                        println!("{} {} {}", operands.len(), nr_handled_operands, expected_operands_len);
                         if nr_handled_operands < expected_operands_len && operands.len() > 0 {
                             let mut operand: usize = 0;
                             let provided_operand = operands.remove(0).content;
@@ -148,14 +148,13 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
                                 Ok(v) => operand = v,
                                 Err(_) => {
                                     assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr, format!(r#"Failed to parse token "{}""#, provided_operand)));
+                                    nr_handled_operands += 1;
+                                    break;
                                 }
                             };
                             let bin_operand = format!("{operand:b}");
                             out_line += &format!("{bin_operand:0>0$}", operand_length);
                             nr_handled_operands += 1;
-                        }
-                        else if nr_handled_operands < expected_operands_len && operands.len() == 0 {
-                            assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr, format!("Too few operands - expected {}, found {}", expected_operands_len, provided_operands_len)));
                         }
                     },
                     Kind::Filler(filler_char, filler_length) => {
@@ -164,18 +163,23 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
                     _ => {
                         assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr,
                         format!(r#"Token/tokens failed to match with any token type"#)));
+                        break;
                     }
                 }
             }
-            if operands.len() > 0 {
-                assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr, format!("Too many operands - expected {}, found {}", expected_operands_len, provided_operands_len)));
+            if nr_handled_operands < expected_operands_len && operands.len() == 0 {
+                assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr, format!("Too few operands - expected {}, found {}", expected_operands_len, provided_operands_len)));
             }
-            match out_line.len() == expected_line_length {
-                true => {
-                    println!("{}", out_line);
-                    out_line += "\n";
+            else if operands.len() > 0 {
+                assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr, format!("Too many operands - expected {}, found {}", expected_operands_len, provided_operands_len)));
+            } else {
+                match out_line.len() == expected_line_length {
+                    true => {
+                        println!("{}", out_line);
+                        out_line += "\n";
+                    }
+                    false => assembler_result.fails.push(Error::in_line(&asm_file_name, &line_nr, format!("Operand/operands out of bounds")))
                 }
-                false => assembler_result.fails.push(Error::in_line(&asm_file_name, &line_nr, format!("Operand exceeded max binary value")))
             }
         } else {
             assembler_result.fails.push(Error::in_line(&asm_file_name, &line_nr, format!(r#"Unknown instruction mnemonic "{}""#, mnemonic)));
