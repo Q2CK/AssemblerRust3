@@ -103,6 +103,12 @@ impl Token {
     }
 }
 
+#[derive(Debug)]
+pub struct Label {
+    pub identifier: String,
+    pub line_nr: usize
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Line {
     pub tokens: Vec<Token>,

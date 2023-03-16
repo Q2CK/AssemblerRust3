@@ -40,8 +40,8 @@ fn read_assembly(file_name: &String) -> Result<String, String> {
     }
 }
 
-fn open_files(isa: &mut Option<ISA>, mut isa_file_name: &mut String, asm: &mut String,
-              mut asm_file_name: &mut String, assembler_result: &mut AssemblerResult) {
+fn open_files(isa: &mut Option<ISA>, isa_file_name: &mut String, asm: &mut String, mut asm_file_name: &mut String,
+              label_declarations: &mut Vec<Label>, assembler_result: &mut AssemblerResult) {
 
     let path = env::current_dir().unwrap();
 
@@ -56,7 +56,9 @@ fn open_files(isa: &mut Option<ISA>, mut isa_file_name: &mut String, asm: &mut S
         Err(e) => assembler_result.fails.push(Error::no_line(&asm_file_name, e))
     }
 
-    let isa_declarations: Vec<String> = asm.split("\n")
+    let asm_lines = asm.split("\n");
+
+    let isa_declarations: Vec<String> = asm_lines
         .filter(|x| x.starts_with(RESERVED_ISA))
         .map(|x| x.to_string())
         .collect();
@@ -87,25 +89,52 @@ fn open_files(isa: &mut Option<ISA>, mut isa_file_name: &mut String, asm: &mut S
     } else {
         assembler_result.fails.push(Error::no_line(&asm_file_name, "Single ISA declaration required".to_string()));
     }
-}
-
-fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String, assembler_result: &mut AssemblerResult) -> String {
-    let mut out = String::new();
-    let mut line_counter = 0;
-    let expected_line_length = isa.cpu_data.instruction_length;
 
     let define_declarations: Vec<String> = asm.split("\n")
         .filter(|x| x.starts_with(RESERVED_DEFINE))
         .map(|x| x.to_string())
         .collect();
 
-    let label_declarations: Vec<String> = asm.split("\n")
-        .filter(|x| x.starts_with(RESERVED_LABEL))
-        .map(|x| x.to_string())
-        .collect();
+    let mut line_counter = 0;
+    *asm = asm.split("\n")
+        .map(str::trim)
+        .filter(|x| {
+            return if x.starts_with(RESERVED_LABEL) {
+                label_declarations.push(Label { identifier: x[1..].to_string(), line_nr: line_counter });
+                false
+            }
+            else if x.starts_with(RESERVED_ISA) || x.starts_with(RESERVED_DEFINE) {
+                false
+            }
+            else if x.chars().all(char::is_whitespace) {
+                false
+            }
+            else {
+                line_counter += 1;
+                true
+            }
+        })
+        .collect::<Vec<&str>>()
+        .join("\n");
+}
+
+fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String, label_declarations: &Vec<Label>, assembler_result: &mut AssemblerResult) -> String {
+    let mut out = String::new();
+    let mut line_counter = 0;
+    let expected_line_length = isa.cpu_data.instruction_length;
 
     let lines: Vec<Line> = asm.split("\n")
         .map(|x| Line::new(x.to_string(), &mut line_counter))
+        .map(|mut line| {
+            for mut token in &mut line.tokens {
+                for label in label_declarations {
+                    if token.content == label.identifier {
+                        token.content = label.line_nr.to_string();
+                    }
+                }
+            }
+            line
+        })
         .collect();
 
     for (line_nr, line) in lines.iter().enumerate() {
@@ -142,8 +171,9 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
                     },
                     Kind::Operand(operand_length) => {
                         if nr_handled_operands < expected_operands_len && operands.len() > 0 {
-                            let mut operand: usize = 0;
+                            let mut operand: usize;
                             let provided_operand = operands.remove(0).content;
+
                             match provided_operand.parse() {
                                 Ok(v) => operand = v,
                                 Err(_) => {
@@ -204,11 +234,13 @@ pub fn assemble() {
         let mut asm = String::new();
         let mut asm_file_name = String::new();
 
-        open_files(&mut isa, &mut isa_file_name, &mut asm, &mut asm_file_name, &mut assembler_result);
+        let mut label_declarations: Vec<Label> = Vec::new();
+
+        open_files(&mut isa, &mut isa_file_name, &mut asm, &mut asm_file_name, &mut label_declarations, &mut assembler_result);
         continue_on_err!(assembler_result);
 
         let isa = isa.unwrap();
-        let bin = parse(&isa, &isa_file_name, &asm, &asm_file_name, &mut assembler_result);
+        let bin = parse(&isa, &isa_file_name, &asm, &asm_file_name, &label_declarations, &mut assembler_result);
         continue_on_err!(assembler_result);
 
         assembler_result.report();
