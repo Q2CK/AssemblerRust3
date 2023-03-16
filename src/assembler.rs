@@ -9,7 +9,7 @@ use std::fs;
 use std::io::{Read, stdin};
 use std::env;
 use std::path::Path;
-use crate::assembler::structs::Kind::Operand;
+use crate::assembler::structs::Kind::*;
 
 const ISA_VALIDATION_ERR_MSG: &str = "Invalid ISA file structure";
 const ISA_READ_ERR_MSG: &str = "Couldn't read ISA file";
@@ -159,7 +159,7 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
 
             for item in expected {
                 match item {
-                    Kind::Opcode(opcode) => {
+                    Opcode(opcode) => {
                         if opcode_found == false {
                             out_line += opcode;
                             opcode_found = true;
@@ -168,7 +168,7 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
                             break;
                         }
                     },
-                    Kind::Operand(operand_length) => {
+                    Operand(operand_length) => {
                         if nr_handled_operands < expected_operands_len && operands.len() > 0 {
                             let mut operand: usize;
                             let provided_operand = operands.remove(0).content;
@@ -186,13 +186,8 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
                             nr_handled_operands += 1;
                         }
                     },
-                    Kind::Filler(filler_char, filler_length) => {
+                    Filler(filler_char, filler_length) => {
                         out_line += &(0..*filler_length).map(|_| filler_char).collect::<String>();
-                    },
-                    _ => {
-                        assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr,
-                        format!(r#"Token/tokens failed to match with any token type"#)));
-                        break;
                     }
                 }
             }
