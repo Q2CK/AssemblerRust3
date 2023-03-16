@@ -71,7 +71,6 @@ fn open_files(isa: &mut Option<ISA>, isa_file_name: &mut String, asm: &mut Strin
                 match deserialize_json_file(&("ISA/".to_string() + isa_file_name_no_prefix)) {
                     Ok(v) => {
                         assembler_result.info.push(v.cpu_data.cpu_name.clone());
-                        assembler_result.info.push("------------------------".to_string());
                         *isa = Some(v);
                         *isa_file_name = isa_file_name_no_prefix.to_string();
                     },
@@ -242,6 +241,12 @@ pub fn assemble() {
         let isa = isa.unwrap();
         let bin = parse(&isa, &isa_file_name, &asm, &asm_file_name, &label_declarations, &mut assembler_result);
         continue_on_err!(assembler_result);
+
+        let bin_file_name = &asm_file_name.replace("ASM", "BIN").replace(".asm", ".bin");
+        match fs::write(Path::new(bin_file_name), bin) {
+            Ok(v) => assembler_result.info.push(format!(r#"Saved to "{}""#, bin_file_name)),
+            Err(_) => assembler_result.fails.push(Error::no_line(bin_file_name, format!(r#"Failed to write to "{}""#, bin_file_name)))
+        }
 
         assembler_result.report();
     }
