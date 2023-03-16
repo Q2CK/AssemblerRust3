@@ -81,7 +81,7 @@ pub struct Token {
 }
 
 impl Token {
-    pub fn new(content: &String) -> Token{
+    pub fn new(content: String) -> Token{
         Token {
             content: content.to_string()
         }
@@ -91,7 +91,7 @@ impl Token {
         line.split(|c| c == ',' || c == ' ')
             .map(str::to_string)
             .filter(|s| !s.is_empty())
-            .map(|x| Token::new(&x))
+            .map(|x| Token::new(x))
             .collect()
     }
 
