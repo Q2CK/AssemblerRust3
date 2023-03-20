@@ -3,8 +3,8 @@
 #define jeden 1
 
 .start
-imm 0, 0
-imm 1, 1
+imm $0, 0
+imm $1, 1
 
 // bajojajo
 

@@ -5,9 +5,6 @@
     "program_memory_lines": 64
   },
   "define": {
-    "general": {
-
-    },
     "registers": {
       "a": "0",
       "b": "1",
