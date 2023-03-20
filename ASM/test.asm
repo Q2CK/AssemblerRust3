@@ -1,6 +1,6 @@
 #isa AnPUNano
 
-#define bajo jajo
+#define jeden 1
 
 # test comment
 
@@ -11,6 +11,6 @@ imm 1, 1
 # test comment
 
 .loop
-add 0, 0, 1
+add 0, 0, jeden
 add 1, 0, 1
 jmp loop

@@ -29,7 +29,7 @@ fn deserialize_json_file(file_name: &String) -> Result<ISA, String> {
     }
     return match serde_json::from_str(&contents) {
         Ok(v) => Ok(v),
-        Err(e) => Err(format!("{} - {}", ISA_VALIDATION_ERR_MSG.to_string(), e.to_string()))
+        Err(e) => Err(format!("{} - {}", ISA_VALIDATION_ERR_MSG, e))
     }
 }
 
@@ -54,7 +54,7 @@ fn open_files(isa: &mut Option<ISA>, isa_file_name: &mut String, asm: &mut Strin
         Err(e) => assembler_result.fails.push(Error::no_line(&asm_file_name, e))
     }
 
-    let asm_lines = asm.split("\n");
+    let asm_lines = asm.split('\n');
 
     let isa_declarations: Vec<String> = asm_lines
         .filter(|x| x.starts_with(RESERVED_ISA))
@@ -91,7 +91,7 @@ fn open_files(isa: &mut Option<ISA>, isa_file_name: &mut String, asm: &mut Strin
     let mut instr_line_counter: usize = 0;
     let mut current_line: usize = 0;
 
-    *asm = asm.split("\n")
+    *asm = asm.split('\n')
         .map(move |x| {
             if x.starts_with(RESERVED_DEFINE) {
                 let mut tokens: Vec<String> = x.split(' ')
@@ -105,6 +105,9 @@ fn open_files(isa: &mut Option<ISA>, isa_file_name: &mut String, asm: &mut Strin
                                        r#"#define requires "<keyword> <replacement>" pair"#.to_string())),
                     3 => {
                         tokens.remove(0);
+
+
+
                         if tokens.iter().all(|y| y.chars().all(char::is_alphanumeric)) {
                             define_declarations.push(
                                 DefinePair { key: tokens[0].clone(), value: tokens[1].clone() }
@@ -150,12 +153,12 @@ fn open_files(isa: &mut Option<ISA>, isa_file_name: &mut String, asm: &mut Strin
         .join("\n");
 }
 
-fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String, label_declarations: &Vec<Label>, assembler_result: &mut AssemblerResult) -> String {
+fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String, label_declarations: &Vec<Label>, define_declarations: &Vec<DefinePair>, assembler_result: &mut AssemblerResult) -> String {
     let mut out = String::new();
     let mut line_counter = 0;
     let expected_line_length = isa.cpu_data.instruction_length;
 
-    let lines: Vec<Line> = asm.split("\n")
+    let lines: Vec<Line> = asm.split('\n')
         .map(|x| Line::new(x.to_string(), &mut line_counter))
         .map(|mut line| {
             for mut token in &mut line.tokens {
@@ -173,7 +176,7 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
         let mut out_line = String::new();
         let mnemonic: String;
 
-        if line.tokens.len() == 0 || line.tokens[0].content.starts_with("#") || line.tokens[0].content.starts_with(RESERVED_LABEL) {
+        if line.tokens.is_empty() || line.tokens[0].content.starts_with('#') || line.tokens[0].content.starts_with(RESERVED_LABEL) {
             continue;
         } else {
             mnemonic = line.tokens[0].content.clone();
@@ -193,7 +196,7 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
             for item in expected {
                 match item {
                     Opcode(opcode) => {
-                        if opcode_found == false {
+                        if !opcode_found {
                             out_line += opcode;
                             opcode_found = true;
                         } else {
@@ -202,9 +205,15 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
                         }
                     },
                     Operand(operand_length) => {
-                        if nr_handled_operands < expected_operands_len && operands.len() > 0 {
+                        if nr_handled_operands < expected_operands_len && !operands.is_empty() {
                             let operand: usize;
-                            let provided_operand = operands.remove(0).content;
+                            let mut provided_operand = operands.remove(0).content;
+
+                            for pair in define_declarations {
+                                if pair.key == provided_operand {
+                                    provided_operand = pair.value.clone();
+                                }
+                            }
 
                             match provided_operand.parse() {
                                 Ok(v) => operand = v,
@@ -224,10 +233,10 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
                     }
                 }
             }
-            if nr_handled_operands < expected_operands_len && operands.len() == 0 {
+            if nr_handled_operands < expected_operands_len && operands.is_empty() {
                 assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr, format!("Too few operands - expected {}, found {}", expected_operands_len, provided_operands_len)));
             }
-            else if operands.len() > 0 {
+            else if !operands.is_empty() {
                 assembler_result.fails.push(Error::in_line(asm_file_name, &line_nr, format!("Too many operands - expected {}, found {}", expected_operands_len, provided_operands_len)));
             } else {
                 match out_line.len() == expected_line_length {
@@ -235,7 +244,7 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
                         println!("{}", out_line);
                         out_line += "\n";
                     }
-                    false => assembler_result.fails.push(Error::in_line(&asm_file_name, &line_nr, format!("Operand/operands out of bounds")))
+                    false => assembler_result.fails.push(Error::in_line(&asm_file_name, &line_nr, "Operand/operands out of bounds".to_string()))
                 }
             }
         } else {
@@ -268,7 +277,7 @@ pub fn assemble() {
         continue_on_err!(assembler_result);
 
         let isa = isa.unwrap();
-        let bin = parse(&isa, &isa_file_name, &asm, &asm_file_name, &label_declarations, &mut assembler_result);
+        let bin = parse(&isa, &isa_file_name, &asm, &asm_file_name, &label_declarations, &define_declarations, &mut assembler_result);
         continue_on_err!(assembler_result);
 
         let bin_file_name = &asm_file_name.replace("ASM", "BIN").replace(".asm", ".bin");

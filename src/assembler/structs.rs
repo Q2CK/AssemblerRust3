@@ -40,13 +40,13 @@ pub struct Error {
 impl Error {
     pub fn no_line(file: &String, message: String) -> Error {
         return Error {
-            file: file.to_string(), line: None, message: message.to_string()
+            file: file.to_string(), line: None, message
         }
     }
 
     pub fn in_line(file: &String, line: &usize, message: String) -> Error {
         return Error {
-            file: file.to_string(), line: Some(*line as u32), message: message.to_string()
+            file: file.to_string(), line: Some(*line as u32), message
         }
     }
 }
@@ -83,7 +83,7 @@ pub struct Token {
 impl Token {
     pub fn new(content: String) -> Token{
         Token {
-            content: content.to_string()
+            content
         }
     }
 
@@ -91,7 +91,7 @@ impl Token {
         line.split(|c| c == ',' || c == ' ')
             .map(str::to_string)
             .filter(|s| !s.is_empty())
-            .map(|x| Token::new(x))
+            .map(Token::new)
             .collect()
     }
 }
