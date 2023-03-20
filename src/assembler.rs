@@ -105,9 +105,6 @@ fn open_files(isa: &mut Option<ISA>, isa_file_name: &mut String, asm: &mut Strin
                                        r#"#define requires "<keyword> <replacement>" pair"#.to_string())),
                     3 => {
                         tokens.remove(0);
-
-
-
                         if tokens.iter().all(|y| y.chars().all(char::is_alphanumeric)) {
                             define_declarations.push(
                                 DefinePair { key: tokens[0].clone(), value: tokens[1].clone() }
@@ -138,13 +135,14 @@ fn open_files(isa: &mut Option<ISA>, isa_file_name: &mut String, asm: &mut Strin
             else if x.starts_with(RESERVED_ISA) {
                 false
             }
-            else if x.starts_with(RESERVED_DEFINE) {
+            else if x.starts_with('#') {
                 false
             }
             else if x.chars().all(char::is_whitespace) {
                 false
             }
             else {
+                println!("{}", x);
                 instr_line_counter += 1;
                 true
             }
