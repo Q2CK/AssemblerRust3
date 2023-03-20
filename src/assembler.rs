@@ -6,7 +6,7 @@ mod macros;
 use structs::*;
 
 use std::fs;
-use std::io::{Read, stdin};
+use std::io::{stdin};
 use std::env;
 use std::path::Path;
 use crate::assembler::structs::Kind::*;
@@ -21,7 +21,7 @@ const RESERVED_LABEL: &str = ".";
 
 fn deserialize_json_file(file_name: &String) -> Result<ISA, String> {
 
-    let mut contents = String::new();
+    let contents: String;
 
     match fs::read_to_string(file_name) {
         Ok(v) => contents = v,
@@ -42,8 +42,6 @@ fn read_assembly(file_name: &String) -> Result<String, String> {
 
 fn open_files(isa: &mut Option<ISA>, isa_file_name: &mut String, asm: &mut String, mut asm_file_name: &mut String,
               label_declarations: &mut Vec<Label>, define_declarations: &mut Vec<DefinePair>, assembler_result: &mut AssemblerResult) {
-
-    let path = env::current_dir().unwrap();
 
     println!("ASM file name: ");
     stdin().read_line(&mut asm_file_name).unwrap();
@@ -205,7 +203,7 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
                     },
                     Operand(operand_length) => {
                         if nr_handled_operands < expected_operands_len && operands.len() > 0 {
-                            let mut operand: usize;
+                            let operand: usize;
                             let provided_operand = operands.remove(0).content;
 
                             match provided_operand.parse() {
@@ -275,7 +273,7 @@ pub fn assemble() {
 
         let bin_file_name = &asm_file_name.replace("ASM", "BIN").replace(".asm", ".bin");
         match fs::write(Path::new(bin_file_name), bin) {
-            Ok(v) => assembler_result.info.push(format!(r#"Saved to "{}""#, bin_file_name)),
+            Ok(_) => assembler_result.info.push(format!(r#"Saved to "{}""#, bin_file_name)),
             Err(_) => assembler_result.fails.push(Error::no_line(bin_file_name, format!(r#"Failed to write to "{}""#, bin_file_name)))
         }
 

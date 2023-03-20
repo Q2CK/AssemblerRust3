@@ -94,13 +94,6 @@ impl Token {
             .map(|x| Token::new(x))
             .collect()
     }
-
-    pub fn to_bin(&self, bits: usize) -> Result<String, String> {
-        match self.content.clone().parse::<usize>() {
-            Ok(v) => Ok(format!("{v:b>bits$}")),
-            Err(_) => Err("Failed to parse operand".to_string())
-        }
-    }
 }
 
 #[derive(Debug)]
