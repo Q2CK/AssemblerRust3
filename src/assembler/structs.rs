@@ -125,3 +125,8 @@ impl Line {
         }
     }
 }
+
+pub struct DefinePair {
+    pub key: String,
+    pub value: String
+}

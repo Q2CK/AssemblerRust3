@@ -41,7 +41,7 @@ fn read_assembly(file_name: &String) -> Result<String, String> {
 }
 
 fn open_files(isa: &mut Option<ISA>, isa_file_name: &mut String, asm: &mut String, mut asm_file_name: &mut String,
-              label_declarations: &mut Vec<Label>, assembler_result: &mut AssemblerResult) {
+              label_declarations: &mut Vec<Label>, define_declarations: &mut Vec<DefinePair>, assembler_result: &mut AssemblerResult) {
 
     let path = env::current_dir().unwrap();
 
@@ -89,27 +89,62 @@ fn open_files(isa: &mut Option<ISA>, isa_file_name: &mut String, asm: &mut Strin
         assembler_result.fails.push(Error::no_line(&asm_file_name, "Single ISA declaration required".to_string()));
     }
 
-    let define_declarations: Vec<String> = asm.split("\n")
-        .filter(|x| x.starts_with(RESERVED_DEFINE))
-        .map(|x| x.to_string())
-        .collect();
+    let mut true_line_counter: usize = 0;
+    let mut instr_line_counter: usize = 0;
+    let mut current_line: usize = 0;
 
-    let mut line_counter = 0;
     *asm = asm.split("\n")
+        .map(move |x| {
+            if x.starts_with(RESERVED_DEFINE) {
+                let mut tokens: Vec<String> = x.split(' ')
+                    .map(str::trim)
+                    .filter(|x| !x.is_empty())
+                    .map(str::to_string)
+                    .collect();
+                match tokens.len() {
+                    0..=2 | 4.. => assembler_result.fails.push(
+                        Error::in_line(&asm_file_name, &current_line,
+                                       r#"#define requires "<keyword> <replacement>" pair"#.to_string())),
+                    3 => {
+                        tokens.remove(0);
+                        if tokens.iter().all(|y| y.chars().all(char::is_alphanumeric)) {
+                            define_declarations.push(
+                                DefinePair { key: tokens[0].clone(), value: tokens[1].clone() }
+                            );
+                        } else {
+                            assembler_result.fails.push(
+                                Error::in_line(&asm_file_name, &current_line,
+                                               "Define keywords must be alphanumeric and separated by whitespaces".to_string())
+                            );
+                        }
+                    }
+                    _ => assembler_result.fails.push(
+                        Error::in_line(&asm_file_name, &true_line_counter,
+                                       "Couldn't parse define statement".to_string())
+                    )
+                }
+            }
+            true_line_counter += 1;
+            current_line = true_line_counter;
+            x
+        })
         .map(str::trim)
         .filter(|x| {
             return if x.starts_with(RESERVED_LABEL) {
-                label_declarations.push(Label { identifier: x[1..].to_string(), line_nr: line_counter });
+                label_declarations.push(Label { identifier: x[1..].to_string(), line_nr: instr_line_counter });
                 false
             }
-            else if x.starts_with(RESERVED_ISA) || x.starts_with(RESERVED_DEFINE) {
+            else if x.starts_with(RESERVED_ISA) {
+                false
+            }
+            else if x.starts_with(RESERVED_DEFINE) {
                 false
             }
             else if x.chars().all(char::is_whitespace) {
                 false
             }
             else {
-                line_counter += 1;
+                instr_line_counter += 1;
                 true
             }
         })
@@ -140,7 +175,7 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
         let mut out_line = String::new();
         let mnemonic: String;
 
-        if line.tokens.len() == 0 || line.tokens[0].content.starts_with(RESERVED_ISA) || line.tokens[0].content.starts_with(RESERVED_DEFINE) || line.tokens[0].content.starts_with(RESERVED_LABEL) {
+        if line.tokens.len() == 0 || line.tokens[0].content.starts_with("#") || line.tokens[0].content.starts_with(RESERVED_LABEL) {
             continue;
         } else {
             mnemonic = line.tokens[0].content.clone();
@@ -229,8 +264,9 @@ pub fn assemble() {
         let mut asm_file_name = String::new();
 
         let mut label_declarations: Vec<Label> = Vec::new();
+        let mut define_declarations: Vec<DefinePair> = Vec::new();
 
-        open_files(&mut isa, &mut isa_file_name, &mut asm, &mut asm_file_name, &mut label_declarations, &mut assembler_result);
+        open_files(&mut isa, &mut isa_file_name, &mut asm, &mut asm_file_name,  &mut label_declarations, &mut define_declarations, &mut assembler_result);
         continue_on_err!(assembler_result);
 
         let isa = isa.unwrap();
