@@ -88,11 +88,11 @@ fn open_files(isa: &mut Option<ISA>, isa_file_name: &mut String, asm: &mut Strin
     }
 
     let mut true_line_counter: usize = 0;
-    let mut instr_line_counter: usize = 0;
     let mut current_line: usize = 0;
+    let mut instr_line_counter: usize = 0;
 
     *asm = asm.split('\n')
-        .map(move |x| {
+        .map(|x| {
             if x.starts_with(RESERVED_DEFINE) {
                 let mut tokens: Vec<String> = x.split(' ')
                     .map(str::trim)
@@ -121,6 +121,9 @@ fn open_files(isa: &mut Option<ISA>, isa_file_name: &mut String, asm: &mut Strin
                                        "Couldn't parse define statement".to_string())
                     )
                 }
+            } else if x.starts_with('#') && !x.starts_with(RESERVED_ISA) {
+                assembler_result.fails.push(Error::in_line(&asm_file_name, &true_line_counter,
+                r##"Unexpected "#" found"##.to_string()));
             }
             true_line_counter += 1;
             current_line = true_line_counter;
@@ -131,17 +134,14 @@ fn open_files(isa: &mut Option<ISA>, isa_file_name: &mut String, asm: &mut Strin
             return if x.starts_with(RESERVED_LABEL) {
                 label_declarations.push(Label { identifier: x[1..].to_string(), line_nr: instr_line_counter });
                 false
-            }
-            else if x.starts_with(RESERVED_ISA) {
+            } else if x.starts_with(RESERVED_DEFINE)
+                || x.starts_with(RESERVED_ISA)
+                || x.starts_with(RESERVED_LABEL)
+                || x.starts_with("//") {
                 false
-            }
-            else if x.starts_with('#') {
+            } else if x.is_empty() {
                 false
-            }
-            else if x.chars().all(char::is_whitespace) {
-                false
-            }
-            else {
+            } else {
                 println!("{}", x);
                 instr_line_counter += 1;
                 true
