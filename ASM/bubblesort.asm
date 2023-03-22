@@ -1,12 +1,13 @@
 #isa AnPUNano
 
-
+---- initialisation ----
 imm $0, 0
 imm $1, 0
 imm $2, 0
 imm $3, 15
 imm $4, 1
 
+------ main loop -------
 .in_loop
 iml $0, 2
 add $2, $2, $4
@@ -25,4 +26,6 @@ brc 5, in_loop
 
 sub $3, $3, $4
 brc 0, in_loop
+
+--------- end ----------
 int 1, 0

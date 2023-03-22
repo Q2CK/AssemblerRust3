@@ -18,6 +18,7 @@ const ASM_ERR_MSG: &str = "Couldn't read ASM file";
 const RESERVED_ISA: &str = "#isa";
 const RESERVED_DEFINE: &str = "#define";
 const RESERVED_LABEL: &str = ".";
+const RESERVED_COMMENT: &str = "--";
 
 fn deserialize_json_file(file_name: &String) -> Result<ISA, String> {
 
@@ -137,7 +138,7 @@ fn open_files(isa: &mut Option<ISA>, isa_file_name: &mut String, asm: &mut Strin
             } else if x.starts_with(RESERVED_DEFINE)
                 || x.starts_with(RESERVED_ISA)
                 || x.starts_with(RESERVED_LABEL)
-                || x.starts_with("//") {
+                || x.starts_with(RESERVED_COMMENT) {
                 false
             } else if x.is_empty() {
                 false
@@ -254,6 +255,11 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
             assembler_result.fails.push(Error::in_line(&asm_file_name, &line_nr, format!(r#"Unknown instruction mnemonic "{}""#, mnemonic)));
         }
         out += &out_line;
+    }
+    let out_len = out.split('\n').filter(|x| !x.is_empty()).count();
+    println!("Memory lines used: {}", out_len);
+    if out_len > isa.cpu_data.program_memory_lines {
+        assembler_result.fails.push(Error::no_line(&asm_file_name, format!("Program memory capacity exceeded - {} lines used, {} available", out_len, isa.cpu_data.program_memory_lines)));
     }
     return out;
 }
