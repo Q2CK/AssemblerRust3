@@ -44,6 +44,7 @@ fn read_assembly(file_name: &String) -> Result<String, String> {
 fn open_files(isa: &mut Option<ISA>, isa_file_name: &mut String, asm: &mut String, mut asm_file_name: &mut String,
               label_declarations: &mut Vec<Label>, define_declarations: &mut Vec<DefinePair>, assembler_result: &mut AssemblerResult) {
 
+    println!("==============");
     println!("ASM file name: ");
     stdin().read_line(&mut asm_file_name).unwrap();
     *asm_file_name = "ASM/".to_string() + &asm_file_name[0..&asm_file_name.len() - 1].to_string().trim();
@@ -69,7 +70,6 @@ fn open_files(isa: &mut Option<ISA>, isa_file_name: &mut String, asm: &mut Strin
                 let isa_file_name_no_prefix = &(v[4..].trim().to_string() + ".json");
                 match deserialize_json_file(&("ISA/".to_string() + isa_file_name_no_prefix)) {
                     Ok(v) => {
-                        assembler_result.info.push(v.cpu_data.cpu_name.clone());
                         *isa = Some(v);
                         *isa_file_name = isa_file_name_no_prefix.to_string();
                     },
@@ -257,7 +257,6 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
         out += &out_line;
     }
     let out_len = out.split('\n').filter(|x| !x.is_empty()).count();
-    println!("Memory lines used: {}", out_len);
     if out_len > isa.cpu_data.program_memory_lines {
         assembler_result.fails.push(Error::no_line(&asm_file_name, format!("Program memory capacity exceeded - {} lines used, {} available", out_len, isa.cpu_data.program_memory_lines)));
     }
@@ -289,9 +288,18 @@ pub fn assemble() {
         let bin = parse(&isa, &isa_file_name, &asm, &asm_file_name, &label_declarations, &mut define_declarations, &mut assembler_result);
         continue_on_err!(assembler_result);
 
+        let out_len = bin.split('\n').filter(|x| !x.is_empty()).count();
+
         let bin_file_name = &asm_file_name.replace("ASM", "BIN").replace(".asm", ".bin");
         match fs::write(Path::new(bin_file_name), bin) {
-            Ok(_) => assembler_result.info.push(format!(r#"Saved to "{}""#, bin_file_name)),
+            Ok(_) => {
+                assembler_result.info.push("\nNO ERRORS FOUND\n".to_string());
+                assembler_result.info.push(format!("CPU: {}", isa.cpu_data.cpu_name.clone()));
+                assembler_result.info.push(format!("Memory lines used: {}/{}\n", out_len, isa.cpu_data.program_memory_lines));
+                assembler_result.info.push(format!("ASM file: {}", asm_file_name));
+                assembler_result.info.push(format!("ISA file: {}\n", isa_file_name));
+                assembler_result.info.push(format!(r#"SAVED TO: "{}"{}"#, bin_file_name, "\n"));
+            },
             Err(_) => assembler_result.fails.push(Error::no_line(bin_file_name, format!(r#"Failed to write to "{}""#, bin_file_name)))
         }
 

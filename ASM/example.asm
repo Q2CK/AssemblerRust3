@@ -1,11 +1,16 @@
 #isa AnPUNano
 
+-- This is a comment
+
+#define one 1
+#define two 2
+
 ---- initialisation ----
 imm $0, 0
 imm $1, 0
 imm $2, 0
 imm $3, 15
-imm $4, 1
+imm $4, one
 
 ------ main loop -------
 .in_loop
@@ -29,5 +34,4 @@ brc 0, in_loop
 
 --------- end ----------
 int 1, 0
-
 
