@@ -253,20 +253,13 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
                     true => {
                         out_line += "\n";
                     }
-                    false => {
-                        if expected_line_length % out_line.len() != 0 {
-                            assembler_result.fails.push(Error::in_line(&asm_file_name, &line_nr, "Operand/operands out of bounds".to_string()))
-                        } else {
-                            for i in 0..(expected_line_length / out_line.len()) {
-                                out_line.insert(i * (expected_line_length + 1), '\n');
-                            }
-                        }
-                    }
+                    false => assembler_result.fails.push(Error::in_line(&asm_file_name, &line_nr, "Operand/operands out of bounds".to_string()))
                 }
             }
         } else {
             assembler_result.fails.push(Error::in_line(&asm_file_name, &line_nr, format!(r#"Unknown instruction mnemonic "{}""#, mnemonic)));
         }
+        println!("{}", out_line);
         out += &out_line;
     }
     let out_len = out.split(line_separation).filter(|x| !x.is_empty()).count();
