@@ -10,6 +10,7 @@ use std::io::{stdin};
 use std::env;
 use std::path::Path;
 use crate::assembler::structs::Kind::*;
+use std::slice::Chunks;
 
 const ISA_VALIDATION_ERR_MSG: &str = "Invalid ISA file structure";
 const ISA_READ_ERR_MSG: &str = "Couldn't read ISA file";
@@ -19,6 +20,10 @@ const RESERVED_ISA: &str = "#isa";
 const RESERVED_DEFINE: &str = "#define";
 const RESERVED_LABEL: &str = ".";
 const RESERVED_COMMENT: &str = "--";
+
+fn line_separation(c: char) -> bool {
+    c == '\n'
+}
 
 fn deserialize_json_file(file_name: &String) -> Result<ISA, String> {
 
@@ -56,7 +61,7 @@ fn open_files(isa: &mut Option<ISA>, isa_file_name: &mut String, asm: &mut Strin
         Err(e) => assembler_result.fails.push(Error::no_line(&asm_file_name, e))
     }
 
-    let asm_lines = asm.split('\n');
+    let asm_lines = asm.split(line_separation);
 
     let isa_declarations: Vec<String> = asm_lines
         .filter(|x| x.starts_with(RESERVED_ISA))
@@ -92,7 +97,7 @@ fn open_files(isa: &mut Option<ISA>, isa_file_name: &mut String, asm: &mut Strin
     let mut current_line: usize = 0;
     let mut instr_line_counter: usize = 0;
 
-    *asm = asm.split('\n')
+    *asm = asm.split(line_separation)
         .map(|x| {
             if x.starts_with(RESERVED_DEFINE) {
                 let mut tokens: Vec<String> = x.split(' ')
@@ -156,7 +161,7 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
     let mut line_counter = 0;
     let expected_line_length = isa.cpu_data.instruction_length;
 
-    let lines: Vec<Line> = asm.split('\n')
+    let lines: Vec<Line> = asm.split(line_separation)
         .map(|x| Line::new(x.to_string(), &mut line_counter))
         .map(|mut line| {
             for mut token in &mut line.tokens {
@@ -248,7 +253,15 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
                     true => {
                         out_line += "\n";
                     }
-                    false => assembler_result.fails.push(Error::in_line(&asm_file_name, &line_nr, "Operand/operands out of bounds".to_string()))
+                    false => {
+                        if expected_line_length % out_line.len() != 0 {
+                            assembler_result.fails.push(Error::in_line(&asm_file_name, &line_nr, "Operand/operands out of bounds".to_string()))
+                        } else {
+                            for i in 0..(expected_line_length / out_line.len()) {
+                                out_line.insert(i * (expected_line_length + 1), '\n');
+                            }
+                        }
+                    }
                 }
             }
         } else {
@@ -256,7 +269,7 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
         }
         out += &out_line;
     }
-    let out_len = out.split('\n').filter(|x| !x.is_empty()).count();
+    let out_len = out.split(line_separation).filter(|x| !x.is_empty()).count();
     if out_len > isa.cpu_data.program_memory_lines {
         assembler_result.fails.push(Error::no_line(&asm_file_name, format!("Program memory capacity exceeded - {} lines used, {} available", out_len, isa.cpu_data.program_memory_lines)));
     }
@@ -288,7 +301,7 @@ pub fn assemble() {
         let bin = parse(&isa, &isa_file_name, &asm, &asm_file_name, &label_declarations, &mut define_declarations, &mut assembler_result);
         continue_on_err!(assembler_result);
 
-        let out_len = bin.split('\n').filter(|x| !x.is_empty()).count();
+        let out_len = bin.split(line_separation).filter(|x| !x.is_empty()).count();
 
         let bin_file_name = &asm_file_name.replace("ASM", "BIN").replace(".asm", ".bin");
         match fs::write(Path::new(bin_file_name), bin) {
