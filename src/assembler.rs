@@ -259,7 +259,7 @@ fn parse(isa: &ISA, isa_file_name: &String, asm: &String, asm_file_name: &String
         } else {
             assembler_result.fails.push(Error::in_line(&asm_file_name, &line_nr, format!(r#"Unknown instruction mnemonic "{}""#, mnemonic)));
         }
-        println!("{}", out_line);
+        // println!("{}", out_line);
         out += &out_line;
     }
     let out_len = out.split(line_separation).filter(|x| !x.is_empty()).count();

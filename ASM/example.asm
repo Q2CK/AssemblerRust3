@@ -2,6 +2,7 @@
 
 -- This is a comment
 
+-- These are just some nonsense keywords as an example
 #define one 1
 #define two 2
 
